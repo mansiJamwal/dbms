@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CartItem from "./cartItem";
+import Toast from "./Toast";
 import { validateCoupon } from "../services/couponService";
 import type { CouponValidationResult } from "../services/couponService";
 import axiosInstance from "../api/axiosConfig";
@@ -35,6 +36,11 @@ export default function Cart() {
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [cartTotal, setCartTotal] = useState<number>(0);
   const [discount, setDiscount] = useState<number>(0);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({
+    message: "",
+    visible: false,
+  });
 
   const user = useAuth();
   const [userId, setUserId] = useState<string | null>(null);
@@ -133,6 +139,9 @@ export default function Cart() {
   }, [cartItems]);
 
   async function handleCheckout() {
+    if (isCheckingOut) return; // Prevent double submission
+    
+    setIsCheckingOut(true);
     try {
       
       // Get coupon ID if a coupon is applied
@@ -200,19 +209,34 @@ export default function Cart() {
         setDiscount(0);
         setCartTotal(0);
 
-        alert("Order placed successfully!");
-        navigate("/transactions");
+        // Show success toast
+        setToast({ message: "Order placed successfully! 🎉", visible: true });
+        
+        // Navigate after a short delay
+        setTimeout(() => {
+          navigate("/transactions");
+        }, 2000);
       } else {
         throw new Error("Failed to create transaction");
       }
     } catch (error) {
       console.error("Checkout error:", error);
-      alert("Checkout failed. Please try again.");
+      setToast({ message: "Checkout failed. Please try again.", visible: true });
+    } finally {
+      setIsCheckingOut(false);
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 pt-20 pb-16">
+      {/* Toast Notification */}
+      {toast.visible && (
+        <Toast
+          message={toast.message}
+          onClose={() => setToast({ message: "", visible: false })}
+        />
+      )}
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -389,10 +413,24 @@ export default function Cart() {
                   <div  className="mt-6 space-y-3">
                     <button
                       onClick={handleCheckout}
-                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2"
+                      disabled={isCheckingOut}
+                      className={`w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                        isCheckingOut 
+                          ? 'opacity-75 cursor-not-allowed' 
+                          : 'hover:shadow-xl transform hover:scale-105'
+                      }`}
                     >
-                      Proceed to Checkout
-                      <FaArrowRight />
+                      {isCheckingOut ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-3 border-white border-t-transparent"></div>
+                          Processing Order...
+                        </>
+                      ) : (
+                        <>
+                          Proceed to Checkout
+                          <FaArrowRight />
+                        </>
+                      )}
                     </button>
                     <button
                       onClick={() => navigate("/products")}
